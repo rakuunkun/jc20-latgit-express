@@ -1,13 +1,17 @@
 const express = require("express");
-// const { verifyTokenAccess, verifyTokenEmail } = require("../lib/verifyToken");
+const { verifyTokenAccess, verifyTokenEmail } = require("../lib/verifyToken");
 const Router = express.Router();
 const { authControllers } = require("./../controllers");
-const { login } = authControllers;
-const { verifyTokenAccess } = require("./../lib/verifyTokenAccess");
-const { register } = require("../controllers/authControllers");
+const { login, deactiveUser, register } = authControllers;
 
-Router.post("/login", login);
-module.exports = Router;
+const validateAdmin = (req, res, next) => {
+  if (req.user.roles_id === 1) {
+    // admin roles_idnya 1
+    next();
+  } else {
+    return res.status(401).send({ message: "user unauthorized" });
+  }
+};
 
 const middlewareValidate = (req, res, next) => {
   const { password, confirmpassword } = req.body;
@@ -41,3 +45,6 @@ const middlewareValidate = (req, res, next) => {
 };
 
 Router.post("/register", middlewareValidate, register);
+Router.post("/login", login);
+Router.patch("/deactivate", verifyTokenAccess, validateAdmin, deactiveUser);
+module.exports = Router;
