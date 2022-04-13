@@ -1,32 +1,56 @@
-const { createJwtAccess } = require("../lib/jwt");
-const { registerService } = require("../service/authService");
-const { dbCon } = require("../connection");
+const { dbCon } = require("./../connection");
+// encrypsi by crypto
+const crypto = require("crypto");
+
+const hashPass = (password) => {
+  let hashing = crypto
+    .createHmac("sha256", "puripuriprisoner")
+    .update(password)
+    .digest("hex");
+  return hashing;
+};
 
 module.exports = {
-  // register
-  register: async (req, res) => {
+  registerService: async (data) => {
+    let conn, sql;
+    let { username, email, password } = data;
     try {
-      const {
-        success,
-        data: userData,
-        message,
-      } = await registerService(req.body);
-      if (!success) {
-        throw { message: message };
+      // buat connection dari pool karena query lebih dari satu kali
+      conn = await dbCon.promise().getConnection();
+      // validasi spasi untuk username
+      let spasi = new RegExp(/ /g);
+      if (spasi.test(username)) {
+        //   kalo ada spasi masuk sini
+        throw { message: "tidak boleh ada spasi" };
       }
+      await conn.beginTransaction();
+      sql = `select id from users where username = ? or email =?`;
 
-      const dataToken = {
-        id: userData.id,
-        username: userData.username,
+      let [result] = await conn.query(sql, [username, email]);
+      if (result.length) {
+        //    masuk sini berarti ada username atau email yang sama
+        throw { message: "username atau email telah digunakan" };
+      }
+      sql = `INSERT INTO users set ?`;
+      //   buat object baru
+      let insertData = {
+        username,
+        email,
+        password: hashPass(password),
+        roles_id: 2,
       };
 
-      const tokenAccess = createJwtAccess(dataToken);
-
-      res.set("x-token-access", tokenAccess);
-      return res.status(200).send(userData);
+      let [result1] = await conn.query(sql, insertData);
+      //   get data user lagi
+      sql = `select * from users where id= ?`;
+      let [userData] = await conn.query(sql, [result1.insertId]);
+      await conn.commit();
+      conn.release();
+      return { success: true, data: userData[0] };
     } catch (error) {
-      console.log(error);
-      return res.status(500).send({ message: error.message || error });
+      conn.rollback();
+      conn.release();
+      throw new Error(error.message || error);
     }
   },
 };
