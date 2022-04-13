@@ -3,7 +3,7 @@ const mysql = require("mysql2");
 const dbCon = mysql.createPool({
   host: "localhost",
   user: "root",
-  password: "password",
+  password: "password", // a
   database: "bukudb",
   port: 3306,
   connectionLimit: 10,
